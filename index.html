@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workplace Environment Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Workplace Environment Monitor</h1>
+        <div id="status">Initializing...</div>
+    </header>
+
+    <main class="dashboard">
+        <section class="stats-grid">
+            <div class="card"><h3>Temperature</h3><p id="temperature">--</p><span>°C</span></div>
+            <div class="card"><h3>Humidity</h3><p id="humidity">--</p><span>%</span></div>
+            <div class="card"><h3>Air Quality</h3><p id="air_quality">--</p><span>AQI</span></div>
+            <div class="card"><h3>Light</h3><p id="light">--</p><span>lux</span></div>
+            <div class="card"><h3>Pressure</h3><p id="pressure">--</p><span>hPa</span></div>
+        </section>
+
+        <section class="charts-grid">
+            <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
+            <div class="chart-container"><canvas id="humidityChart"></canvas></div>
+            <div class="chart-container"><canvas id="aqiChart"></canvas></div>
+            <div class="chart-container"><canvas id="lightChart"></canvas></div>
+            <div class="chart-container"><canvas id="pressureChart"></canvas></div>
+        </section>
+
+        <section class="map-section">
+            <div id="map"></div>
+        </section>
+
+        <section class="ai-recommendations">
+            <h2>Grok Workplace Safety Insights</h2>
+            
+            <div class="ai-controls">
+                <div class="control-group">
+                    <label for="timeRange">Data Range for AI Analysis:</label>
+                    <select id="timeRange">
+                        <option value="all">All Available Data</option>
+                        <option value="3600000">Last 1 Hour</option>
+                        <option value="86400000">Last 24 Hours</option>
+                        <option value="604800000">Last 7 Days</option>
+                    </select>
+                </div>
+
+                <button id="generateAiBtn">Evaluate Workplace Safety</button>
+            </div>
+            
+            <p id="aiStatus" class="ai-disclaimer">Select a zone and click to generate an OSHA-style health evaluation.</p>
+
+            <div class="table-container">
+                <table id="insightsTable">
+                    <thead>
+                        <tr>
+                            <th>Focus Area</th>
+                            <th>Averaged Conditions</th>
+                            <th>Safety & HVAC Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="insightsBody">
+                        <tr>
+                            <td colspan="3" style="text-align: center;">Awaiting generation...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>

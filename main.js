@@ -1,9 +1,9 @@
+// Correcting modular design paradigms across Firebase Framework SDKs
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
-  
+import { getDatabase, ref, query, limitToLast, onValue, orderByChild, startAt, get } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
 
 // ==========================================
-// 1. FIREBASE CONFIGURATION
+// 1. SECURE FIREBASE APPLICATION ROUTING
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyBYI8bOIJHEWMlJegoeqfutrywhzt6VZOI",
@@ -14,244 +14,257 @@ const firebaseConfig = {
     messagingSenderId: "698261743475",
     appId: "1:698261743475:web:29988a16847083a7110706",
     measurementId: "G-Y7HSFWQVYT"
-  };
+};
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-
 // ==========================================
-// 2. INITIALIZE MAP & CHARTS
+// 2. GEOSPATIAL & METRIC CHART COMPANIONS
 // ==========================================
-// Hardcoded Location for Covilhã, Portugal
 const STATION_LAT = 40.277222;
 const STATION_LNG = -7.509361;
 
-const map = L.map('map').setView([STATION_LAT, STATION_LNG], 15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([STATION_LAT, STATION_LNG], 15);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(map); // High fidelity modern dark mapping
 
-const marker = L.marker([STATION_LAT, STATION_LNG])
-    .addTo(map)
-    .bindPopup("<b>Facility Alpha</b><br>Main Operations Floor")
+L.marker([STATION_LAT, STATION_LNG]).addTo(map)
+    .bindPopup("<b style='color:#000;'>Facility Alpha</b><br><span style='color:#333;'>Main Processing Node</span>")
     .openPopup();
 
-// Helper function to build Chart.js instances
-function createChart(ctxId, label, color) {
+function createModernChart(ctxId, label, lineColor) {
     const ctx = document.getElementById(ctxId).getContext('2d');
     return new Chart(ctx, {
         type: 'line',
-        data: { 
-            labels: [], 
-            datasets: [{ 
-                label: label, 
-                data: [], 
-                borderColor: color, 
-                backgroundColor: color + '33', 
-                tension: 0.3, 
-                pointRadius: 2 
-            }] 
+        data: {
+            labels: [],
+            datasets: [{
+                label: label,
+                data: [],
+                borderColor: lineColor,
+                borderWidth: 2,
+                backgroundColor: lineColor + '08',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }]
         },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { legend: { labels: { color: 'white' } } }, 
-            scales: { 
-                x: { ticks: { color: '#aaa' }, grid: { color: '#333' } }, 
-                y: { ticks: { color: '#aaa' }, grid: { color: '#333' } } 
-            } 
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#6b7280', font: { family: 'Plus Jakarta Sans' } }, grid: { display: false } },
+                y: { ticks: { color: '#6b7280', font: { family: 'Plus Jakarta Sans' } }, grid: { color: 'rgba(255,255,255,0.03)' } }
+            }
         }
     });
 }
 
-// Initialize Workplace Charts
 const charts = {
-    temperature: createChart('temperatureChart', 'Temperature (°C)', '#ff5722'), // Deep Orange
-    humidity: createChart('humidityChart', 'Humidity (%)', '#00BFFF'),           // Deep Sky Blue
-    aqi: createChart('aqiChart', 'Air Quality (AQI)', '#32CD32'),                // Lime Green
-    light: createChart('lightChart', 'Light Level (lux)', '#FFD700'),            // Gold
-    pressure: createChart('pressureChart', 'Pressure (hPa)', '#FF6347')          // Tomato Red
+    temperature: createModernChart('temperatureChart', 'Temperature (°C)', '#ff5b24'),
+    humidity: createModernChart('humidityChart', 'Humidity (%)', '#00b0ff'),
+    air_quality_raw: createModernChart('gasChart', 'Air Quality (Raw)', '#10b981'),
+    light_level: createModernChart('lightChart', 'Light Level (%)', '#fbc02d')
 };
 
 // ==========================================
-// 3. LIVE DASHBOARD LOGIC (Single Zone)
+// 3. TELEMETRY SYNCHRONIZATION PIPELINE
 // ==========================================
-const TARGET_ZONE = "main_workspace"; // The Firebase node your Arduino pushes to
-let currentLiveListener = null;
+// Point precisely to the custom node created by your gateway.py file!
+const TARGET_NODE = "Telemetry"; 
 
-function listenToDevice(deviceId) {
-    if (currentLiveListener) currentLiveListener(); 
+function startLiveTelemetryStreaming() {
+    const telemetryRef = query(ref(db, TARGET_NODE), limitToLast(24));
 
-    const sensorRef = query(ref(db, `sensors/${deviceId}`), limitToLast(20));
+    onValue(telemetryRef, (snapshot) => {
+        const payload = snapshot.val();
+        if (payload) {
+            document.getElementById('status').innerText = "Live Operations Streaming Active";
+            document.getElementById('statusPulse').classList.add('active');
+            
+            const timelineLabels = [];
+            const structuralHistory = { temperature: [], humidity: [], air_quality_raw: [], light_level: [] };
+            let terminalEntry = null;
 
-    currentLiveListener = onValue(sensorRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            document.getElementById('status').innerText = `Live Monitoring Active (Zone: ${deviceId})`;
-            const labels = [];
-            const historyData = { temperature: [], humidity: [], aqi: [], light: [], pressure: [] };
-            let latestEntry = null;
-
-            // Extract data for charts and cards
-            Object.keys(data).forEach(key => {
-                latestEntry = data[key];
-                labels.push(new Date(latestEntry.timestamp).toLocaleTimeString());
-                historyData.temperature.push(latestEntry.temperature);
-                historyData.humidity.push(latestEntry.humidity);
-                historyData.aqi.push(latestEntry.aqi);
-                historyData.light.push(latestEntry.light);
-                historyData.pressure.push(latestEntry.pressure);
+            // Loop through entries pushed from Python gateway
+            Object.keys(payload).forEach(hashId => {
+                terminalEntry = payload[hashId];
+                
+                // Fallback timestamp formatting
+                const eventTime = terminalEntry.timestamp ? new Date(terminalEntry.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+                timelineLabels.push(eventTime);
+                
+                if(terminalEntry.temperature) structuralHistory.temperature.push(parseFloat(terminalEntry.temperature));
+                if(terminalEntry.humidity) structuralHistory.humidity.push(parseFloat(terminalEntry.humidity));
+                if(terminalEntry.air_quality_raw) structuralHistory.air_quality_raw.push(terminalEntry.air_quality_raw);
+                if(terminalEntry.light_level) structuralHistory.light_level.push(terminalEntry.light_level);
             });
 
-            // Update UI Cards
-            document.getElementById('temperature').innerText = latestEntry.temperature;
-            document.getElementById('humidity').innerText = latestEntry.humidity;
-            document.getElementById('air_quality').innerText = latestEntry.aqi;
-            document.getElementById('light').innerText = latestEntry.light;
-            document.getElementById('pressure').innerText = latestEntry.pressure;
+            // Refresh Client Visual Interface Elements
+            if (terminalEntry) {
+                document.getElementById('temperature').innerText = terminalEntry.temperature || "N/A";
+                document.getElementById('humidity').innerText = terminalEntry.humidity || "N/A";
+                document.getElementById('air_quality').innerText = terminalEntry.air_quality_raw || "--";
+                document.getElementById('light').innerText = terminalEntry.light_level ? Math.round(terminalEntry.light_level) : "--";
+                document.getElementById('rain').innerText = terminalEntry.rain_status || "Unknown";
+                
+                // Dynamic style adjustment based on rain detection
+                const rainCard = document.querySelector('.rain-card .value-display');
+                if(terminalEntry.rain_status === "Raining") {
+                    rainCard.style.color = "#a855f7";
+                } else {
+                    rainCard.style.color = "#fff";
+                }
+            }
 
-            // Update Charts
-            Object.keys(charts).forEach(sensorType => {
-                charts[sensorType].data.labels = labels;
-                charts[sensorType].data.datasets[0].data = historyData[sensorType];
-                charts[sensorType].update();
+            // Sync structural records to graph configurations
+            Object.keys(charts).forEach(metricKey => {
+                if(structuralHistory[metricKey].length > 0) {
+                    charts[metricKey].data.labels = timelineLabels.slice(-structuralHistory[metricKey].length);
+                    charts[metricKey].data.datasets[0].data = structuralHistory[metricKey];
+                    charts[metricKey].update();
+                }
             });
         } else {
-            document.getElementById('status').innerText = `No data found for ${deviceId}`;
+            document.getElementById('status').innerText = "Telemetry Node Null. Awaiting Data Transmission.";
+            document.getElementById('statusPulse').classList.remove('active');
         }
     });
 }
 
-// Start listening immediately
-listenToDevice(TARGET_ZONE);
+startLiveTelemetryStreaming();
 
 // ==========================================
-// 4. GROK AI WORKPLACE INSIGHTS
+// 4. AUTOMATED INDUSTRIAL AI EVALUATOR
 // ==========================================
 document.getElementById('generateAiBtn').addEventListener('click', async () => {
-    const timeRange = document.getElementById('timeRange').value;
-    const statusText = document.getElementById('aiStatus');
+    const rangeSelection = document.getElementById('timeRange').value;
+    const infoFeedback = document.getElementById('aiStatus');
     
-    statusText.innerText = "Analyzing all workplace metrics & contacting Grok AI...";
+    infoFeedback.innerText = "Querying historical data blocks and requesting safety diagnostics...";
 
-    const deviceRef = ref(db, `sensors/${TARGET_ZONE}`);
-    let aiQuery;
+    const masterRef = ref(db, TARGET_NODE);
+    let executionQuery = masterRef;
 
-    // Fetch data based on selected time window
-    if (timeRange === 'all') {
-        aiQuery = deviceRef; 
-    } else {
-        const startTime = Date.now() - parseInt(timeRange);
-        aiQuery = query(deviceRef, orderByChild('timestamp'), startAt(startTime)); 
+    if (rangeSelection !== 'all') {
+        const rangeBoundaryTimestamp = Date.now() - parseInt(rangeSelection);
+        executionQuery = query(masterRef, orderByChild('timestamp'), startAt(rangeBoundaryTimestamp));
     }
 
     try {
-        const snapshot = await get(aiQuery); 
-        
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            // 1. We now prepare arrays for ALL metrics
-            const aiData = { temperature: [], humidity: [], aqi: [], light: [], pressure: [] };
+        const querySnapshot = await get(executionQuery);
+        if (querySnapshot.exists()) {
+            const compositeDataset = querySnapshot.val();
             
-            Object.values(data).forEach(entry => {
-                if(entry.temperature !== undefined) aiData.temperature.push(entry.temperature);
-                if(entry.humidity !== undefined) aiData.humidity.push(entry.humidity);
-                if(entry.aqi !== undefined) aiData.aqi.push(entry.aqi);
-                if(entry.light !== undefined) aiData.light.push(entry.light);
-                if(entry.pressure !== undefined) aiData.pressure.push(entry.pressure);
+            const analysisArrays = { temp: [], hum: [], gas: [], light: [] };
+            let rainCount = 0;
+            let totalRecords = 0;
+
+            Object.values(compositeDataset).forEach(row => {
+                totalRecords++;
+                if(row.temperature) analysisArrays.temp.push(parseFloat(row.temperature));
+                if(row.humidity) analysisArrays.hum.push(parseFloat(row.humidity));
+                if(row.air_quality_raw) analysisArrays.gas.push(row.air_quality_raw);
+                if(row.light_level) analysisArrays.light.push(row.light_level);
+                if(row.rain_status === "Raining") rainCount++;
             });
 
-            if (aiData.temperature.length > 0) {
-                updateAIInsights(aiData);
-                statusText.innerText = `Comprehensive evaluation complete using ${aiData.temperature.length} data points.`;
+            if(analysisArrays.temp.length > 0) {
+                const averages = {
+                    temp: analysisArrays.temp.reduce((s,v)=>s+v,0) / analysisArrays.temp.length,
+                    hum: analysisArrays.hum.reduce((s,v)=>s+v,0) / analysisArrays.hum.length,
+                    gas: analysisArrays.gas.reduce((s,v)=>s+v,0) / analysisArrays.gas.length,
+                    light: analysisArrays.light.reduce((s,v)=>s+v,0) / analysisArrays.light.length,
+                    rainPct: (rainCount / totalRecords) * 100
+                };
+                
+                await communicateWithGrokEngine(averages, infoFeedback);
             } else {
-                statusText.innerText = "Data found, but missing sensor values.";
+                infoFeedback.innerText = "Telemetry records fetched, but entries lacked valid numeric properties.";
             }
         } else {
-            statusText.innerText = "No data found for the selected time range.";
+            infoFeedback.innerText = "No data snapshots found matching chosen timeline window.";
         }
-    } catch (error) {
-        console.error("Firebase fetch error:", error);
-        statusText.innerText = "Error fetching data. Check console.";
+    } catch(err) {
+        console.error("Firebase runtime acquisition error:", err);
+        infoFeedback.innerText = "Error pulling data. Verify credentials inside code console.";
     }
 });
 
-async function updateAIInsights(historyData) {
-    // 2. Calculate averages for ALL metrics
-    const avgTemp = historyData.temperature.reduce((a, b) => a + b, 0) / historyData.temperature.length;
-    const avgHum = historyData.humidity.reduce((a, b) => a + b, 0) / historyData.humidity.length;
-    const avgAqi = historyData.aqi.reduce((a, b) => a + b, 0) / historyData.aqi.length;
-    const avgLight = historyData.light.reduce((a, b) => a + b, 0) / historyData.light.length;
-    const avgPressure = historyData.pressure.reduce((a, b) => a + b, 0) / historyData.pressure.length;
-    
-    const tbody = document.getElementById('insightsBody');
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #ff5722;">Connecting to Grok AI for Safety Evaluation...</td></tr>`;
+async function communicateWithGrokEngine(metrics, statusElement) {
+    const feedbackTableBody = document.getElementById('insightsBody');
+    feedbackTableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #ec4899; padding: 30px;">Evaluating workplace parameters through Deep AI Matrix...</td></tr>`;
 
-    // ⚠️ DANGER: DO NOT PUBLISH THIS KEY ON A PUBLIC WEBSITE.
-    const GROK_API_KEY = "xoxb-YOUR_ACTUAL_GROK_API_KEY_HERE"; 
+    // ⚠️ CRITICAL NOTICE: Replace this with your backend routing path if deploying publicly!
+    const RUNTIME_TOKEN = "xoxb-YOUR_ACTUAL_GROK_API_KEY_HERE"; 
 
-    // 3. UPDATED PROMPT: Giving Grok all the data and expanding its scope
-    const prompt = `You are an Occupational Health and Safety (OHS) expert. Evaluate a workplace environment currently averaging:
-    - Temperature: ${avgTemp.toFixed(1)}°C
-    - Humidity: ${avgHum.toFixed(1)}%
-    - Air Quality (AQI): ${avgAqi.toFixed(0)}
-    - Light Level: ${avgLight.toFixed(0)} lux
-    - Air Pressure: ${avgPressure.toFixed(1)} hPa
+    const evaluationContextPrompt = `You are an expert workspace safety engineer. Assess this office's metrics:
+    - Temperature Average: ${metrics.temp.toFixed(1)}°C
+    - Relative Humidity: ${metrics.hum.toFixed(1)}%
+    - Air Quality Sensor Value (Raw MQ135): ${metrics.gas.toFixed(0)} (0-4095 scale, where higher means more volatile organic compounds/smoke)
+    - Ambient Illumination: ${metrics.light.toFixed(0)}% Light Level
+    - External Precipitation Incidence: ${metrics.rainPct.toFixed(0)}% of tracked period caught rain.
     
-    Provide comprehensive recommendations based on thermal comfort, respiratory safety, visual ergonomics, and overall worker well-being.
-    Return ONLY a valid JSON object with exactly two keys: 
-    "facility" (3-4 sentences advising on HVAC, air filtration, lighting adjustments, and physical facility controls) and 
-    "personnel" (3-4 sentences advising on worker safety protocols, break schedules, hydration, eye strain mitigation, or protective measures). 
-    Do not include markdown blocks or any other text outside the JSON.`;
+    Provide concise engineering recommendations based on thermal comfort, air filtration requirements, and visual ergonomics.
+    Return ONLY a raw, unquoted JSON object with exactly two string keys: 
+    "facility" (2-3 sentences advising on facility management, HVAC adjustments, or mechanical ventilation updates) and 
+    "personnel" (2-3 sentences outlining worker safety rules, breaks, visual strain care, or ergonomic instructions). 
+    Do not add markdown wrappers or structural content outside this clean JSON structure.`;
 
     try {
-        const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        const serverResponse = await fetch('https://api.x.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GROK_API_KEY}`
+                'Authorization': `Bearer ${RUNTIME_TOKEN}`
             },
             body: JSON.stringify({
-                model: "grok-beta", 
+                model: "grok-beta",
                 messages: [
-                    { role: "system", content: "You are a professional occupational safety assistant." },
-                    { role: "user", content: prompt }
+                    { role: "system", content: "You are an analytical environmental compliance validation engine." },
+                    { role: "user", content: evaluationContextPrompt }
                 ],
-                temperature: 0.2 
+                temperature: 0.1
             })
         });
 
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        if (!serverResponse.ok) throw new Error(`API Connection Failed: ${serverResponse.status}`);
 
-        const data = await response.json();
-        const aiResponseText = data.choices[0].message.content.trim();
+        const payloadJson = await serverResponse.json();
+        const outputContent = payloadJson.choices[0].message.content.trim();
         
-        const cleanJsonString = aiResponseText.replace(/```json/gi, '').replace(/```/g, '');
-        const aiInsights = JSON.parse(cleanJsonString);
+        const strictJsonPayloadString = outputContent.replace(/```json/gi, '').replace(/```/g, '');
+        const verifiedInsights = JSON.parse(strictJsonPayloadString);
 
-        // 4. Inject the expanded data into the UI Table
-        tbody.innerHTML = `
+        statusElement.innerText = "Workplace environmental profile successfully cross-referenced.";
+        
+        feedbackTableBody.innerHTML = `
             <tr>
-                <td>Facility Systems<br><small style="color:#aaa;">(HVAC, Air, Lighting)</small></td>
+                <td><b>Infrastructure Systems</b><br><small style="color:#71717a;">HVAC & Lighting Assets</small></td>
                 <td>
-                    Temp: <strong>${avgTemp.toFixed(1)}°C</strong> | Hum: <strong>${avgHum.toFixed(1)}%</strong><br>
-                    AQI: <strong>${avgAqi.toFixed(0)}</strong> | Light: <strong>${avgLight.toFixed(0)} lux</strong><br>
-                    Pressure: <strong>${avgPressure.toFixed(0)} hPa</strong>
+                    Temp: <strong>${metrics.temp.toFixed(1)}°C</strong><br>
+                    Humid: <strong>${metrics.hum.toFixed(1)}%</strong><br>
+                    Illumination: <strong>${metrics.light.toFixed(0)}%</strong>
                 </td>
-                <td>${aiInsights.facility}</td>
+                <td>${verifiedInsights.facility}</td>
             </tr>
             <tr>
-                <td>Personnel Safety<br><small style="color:#aaa;">(Protocols & Comfort)</small></td>
-                <td>Comprehensive Ergonomics & Health Assessment</td>
-                <td>${aiInsights.personnel}</td>
+                <td><b>Occupant Protection</b><br><small style="color:#71717a;">Personnel Standards</small></td>
+                <td>
+                    Air Quality Index: <strong>${metrics.gas.toFixed(0)} raw</strong><br>
+                    Rain Exposure: <strong>${metrics.rainPct.toFixed(0)}%</strong>
+                </td>
+                <td>${verifiedInsights.personnel}</td>
             </tr>
         `;
-
-    } catch (error) {
-        console.error("Grok AI Fetch Error:", error);
-        tbody.innerHTML = `
+    } catch(err) {
+        console.error("Grok Engine handshake exception:", err);
+        feedbackTableBody.innerHTML = `
             <tr>
-                <td colspan="3" style="text-align: center; color: #FF6347;">
-                    Failed to load safety evaluation. Check API key and browser console.
+                <td colspan="3" style="text-align: center; color: #ef4444; padding: 20px;">
+                    Failed to finalize compliance generation. Verify token mapping configs inside web console arrays.
                 </td>
             </tr>
         `;

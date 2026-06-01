@@ -3,69 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workplace Environment Dashboard</title>
+    <title>Enterprise Office Environment Monitor</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header>
-        <h1>Workplace Environment Monitor</h1>
-        <div id="status">Initializing...</div>
+    <div class="glow-bg-overlay"></div>
+    
+    <header class="app-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <span class="pulse-indicator" id="statusPulse"></span>
+                <h1>Workplace Environment Monitor</h1>
+            </div>
+            <div id="status" class="status-badge">Initializing Gateway Stream...</div>
+        </div>
     </header>
 
-    <main class="dashboard">
+    <main class="dashboard-container">
         <section class="stats-grid">
-            <div class="card"><h3>Temperature</h3><p id="temperature">--</p><span>°C</span></div>
-            <div class="card"><h3>Humidity</h3><p id="humidity">--</p><span>%</span></div>
-            <div class="card"><h3>Air Quality</h3><p id="air_quality">--</p><span>AQI</span></div>
-            <div class="card"><h3>Light</h3><p id="light">--</p><span>lux</span></div>
-            <div class="card"><h3>Pressure</h3><p id="pressure">--</p><span>hPa</span></div>
+            <div class="card temp-card">
+                <div class="card-icon">🌡️</div>
+                <h3>Temperature</h3>
+                <div class="value-display"><span id="temperature">--</span><span class="unit">°C</span></div>
+            </div>
+            <div class="card humidity-card">
+                <div class="card-icon">💧</div>
+                <h3>Humidity</h3>
+                <div class="value-display"><span id="humidity">--</span><span class="unit">%</span></div>
+            </div>
+            <div class="card gas-card">
+                <div class="card-icon">🍃</div>
+                <h3>Air Quality</h3>
+                <div class="value-display"><span id="air_quality">--</span><span class="unit">raw</span></div>
+            </div>
+            <div class="card light-card">
+                <div class="card-icon">☀️</div>
+                <h3>Light Level</h3>
+                <div class="value-display"><span id="light">--</span><span class="unit">%</span></div>
+            </div>
+            <div class="card rain-card">
+                <div class="card-icon">🌧️</div>
+                <h3>Precipitation</h3>
+                <div class="value-display"><span id="rain">--</span></div>
+            </div>
         </section>
 
-        <section class="charts-grid">
-            <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
-            <div class="chart-container"><canvas id="humidityChart"></canvas></div>
-            <div class="chart-container"><canvas id="aqiChart"></canvas></div>
-            <div class="chart-container"><canvas id="lightChart"></canvas></div>
-            <div class="chart-container"><canvas id="pressureChart"></canvas></div>
+        <section class="visuals-grid">
+            <div class="chart-panel"><canvas id="temperatureChart"></canvas></div>
+            <div class="chart-panel"><canvas id="humidityChart"></canvas></div>
+            <div class="chart-panel"><canvas id="gasChart"></canvas></div>
+            <div class="chart-panel"><canvas id="lightChart"></canvas></div>
         </section>
 
-        <section class="map-section">
+        <section class="map-panel">
+            <div class="panel-header"><h3>Facility Asset Location Map</h3></div>
             <div id="map"></div>
         </section>
 
-        <section class="ai-recommendations">
-            <h2>Grok Workplace Safety Insights</h2>
-            
-            <div class="ai-controls">
-                <div class="control-group">
-                    <label for="timeRange">Data Range for AI Analysis:</label>
-                    <select id="timeRange">
-                        <option value="all">All Available Data</option>
-                        <option value="3600000">Last 1 Hour</option>
-                        <option value="86400000">Last 24 Hours</option>
-                        <option value="604800000">Last 7 Days</option>
-                    </select>
+        <section class="ai-panel">
+            <div class="ai-header">
+                <div class="ai-title">
+                    <span class="ai-sparkle">✦</span>
+                    <h2>Grok Workplace Safety Insights</h2>
                 </div>
-
-                <button id="generateAiBtn">Evaluate Workplace Safety</button>
+                <div class="ai-controls">
+                    <div class="select-wrapper">
+                        <select id="timeRange">
+                            <option value="all">All Available Data</option>
+                            <option value="3600000">Last 1 Hour</option>
+                            <option value="86400000">Last 24 Hours</option>
+                            <option value="604800000">Last 7 Days</option>
+                        </select>
+                    </div>
+                    <button id="generateAiBtn">Evaluate Workplace Safety</button>
+                </div>
             </div>
             
-            <p id="aiStatus" class="ai-disclaimer">Select a zone and click to generate an OSHA-style health evaluation.</p>
+            <p id="aiStatus" class="ai-status-hint">Select a zone and click to generate an OSHA-style health evaluation.</p>
 
             <div class="table-container">
                 <table id="insightsTable">
                     <thead>
                         <tr>
-                            <th>Focus Area</th>
-                            <th>Averaged Conditions</th>
-                            <th>Safety & HVAC Recommendation</th>
+                            <th width="20%">Focus Area</th>
+                            <th width="30%">Averaged Conditions</th>
+                            <th width="50%">Safety & HVAC Recommendation</th>
                         </tr>
                     </thead>
                     <tbody id="insightsBody">
                         <tr>
-                            <td colspan="3" style="text-align: center;">Awaiting generation...</td>
+                            <td colspan="3" class="table-empty-state">Awaiting generation execution trigger...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -74,6 +106,7 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="script.js"></script>
+    
+    <script type="module" src="main.js"></script>
 </body>
 </html>

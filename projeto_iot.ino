@@ -1,5 +1,5 @@
 #include <WiFi.h>
-#include <FirebaseESP32.h>
+#include <PubSubClient.h>
 
 // Wi-Fi Credentials
 #define WIFI_SSID "Palhaco"
@@ -7,6 +7,12 @@
 
 // Firebase Credentials (FIXED: No https:// and no trailing /)
 #define FIREBASE_HOST "iot1-46d86-default-rtdb.europe-west1.firebasedatabase.app"
+
+//Broker stuff
+const char* mqtt_server = "10.96.84.63";
+const int mqtt_port = 1883;
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 // Pin Configurations
 const int KY018_PIN = 32;
@@ -21,11 +27,6 @@ const int SENSOR_ESCURO_TOTAL = 3400;
 int rawGasValue = 0, rawLightValue = 0, rawRainValue = 0;
 float gasPercentage = 0.0, lightPercentage = 0.0;
 byte dat[5];
-
-// Firebase Data Objects
-FirebaseData firebaseData;
-FirebaseConfig config;
-FirebaseAuth auth;
 
 byte read_data() {
   byte result = 0;
@@ -55,6 +56,26 @@ void start_test() {
   for(int i = 0; i < 5; i++) dat[i] = read_data();
 }
 
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
+    
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+      // Subscribe to topics here
+      client.subscribe("esp32/output");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   
@@ -73,19 +94,15 @@ void setup() {
   }
   Serial.println("\nConnected to Wi-Fi!");
 
-  // -----------------------------------------------------------
-  // FIREBASE CONFIGURATION (FIXED)
-  // -----------------------------------------------------------
-  config.database_url = FIREBASE_HOST; 
-  
-  // Enable Test Mode for open database rules (bypasses auth requirement)
-  config.signer.test_mode = true; 
-  
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
+  client.setServer(mqtt_server, mqtt_port);
 }
 
 void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
   start_test(); 
   
   // Sensor Readings (Rain is now Digital!)
@@ -103,26 +120,24 @@ void loop() {
   bool dataValid = (dat[4] == checksum) && (checksum != 0);
 
   // Construct JSON Payload
-  FirebaseJson json;
-  if (dataValid) {
-    json.set("temperature", String(dat[2]) + "." + String(dat[3]));
-    json.set("humidity", String(dat[0]) + "." + String(dat[1]));
-  }
-  json.set("light_level", lightPercentage);
-  json.set("light_raw", rawLightValue);
-  json.set("rain_raw", rawRainValue);
-  json.set("rain_status", rawRainValue == HIGH ? "Raining" : "Dry");
-  json.set("air_quality_raw", rawGasValue);
+// Construct JSON Payload manually using standard Strings
+  String jsonString = "{";
   
-  // -----------------------------------------------------------
-  // THE FIX: Use pushJSON to keep a history of all readings
-  // -----------------------------------------------------------
-  if (Firebase.pushJSON(firebaseData, "/Telemetry", json)) {
-    Serial.println("Success: Telemetry successfully pushed to Firebase Cloud history!");
-  } else {
-    Serial.print("Firebase Send Failed: ");
-    Serial.println(firebaseData.errorReason());
+  if (dataValid) {
+    jsonString += "\"temperature\":\"" + String(dat[2]) + "." + String(dat[3]) + "\",";
+    jsonString += "\"humidity\":\"" + String(dat[0]) + "." + String(dat[1]) + "\",";
   }
+  
+  jsonString += "\"light_level\":" + String(lightPercentage) + ",";
+  jsonString += "\"light_raw\":" + String(rawLightValue) + ",";
+  jsonString += "\"rain_raw\":" + String(rawRainValue) + ",";
+  jsonString += "\"rain_status\":\"" + String(rawRainValue == HIGH ? "Raining" : "Dry") + "\",";
+  jsonString += "\"air_quality_raw\":" + String(rawGasValue);
+  jsonString += "}"; // Close the JSON object
+
+  // Publish to MQTT
+  client.publish("esp32/telemetry", jsonString.c_str());
+  Serial.println("Success: Telemetry successfully published to MQTT!");
 
   delay(3000); 
 }

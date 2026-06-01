@@ -337,3 +337,31 @@ td {
     color: var(--text-muted);
     padding: 40px 0;
 }
+
+/* Traffic Light Indicator Classes */
+.status-safe { color: #10b981 !important; }   /* Green */
+.status-warning { color: #fbc02d !important; } /* Yellow */
+.status-danger { color: #ef4444 !important; }  /* Red */
+
+/* Web Notification Banner */
+#alertBanner {
+    position: fixed;
+    top: -100px; /* Hidden by default */
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    color: white;
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-weight: 700;
+    box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+    z-index: 9999;
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#alertBanner.show {
+    top: 24px; 
+}

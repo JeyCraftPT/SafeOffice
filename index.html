@@ -12,13 +12,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <div id="alertBanner">
+        <span style="font-size: 1.5rem;">⚠️</span>
+        <span id="alertText">CRITICAL ALERT DETECTED</span>
+    </div>
     <div class="glow-bg-overlay"></div>
     
     <header class="app-header">
         <div class="header-content">
             <div class="logo-area">
                 <span class="pulse-indicator" id="statusPulse"></span>
-                <h1>Workplace Environment Monitor</h1>
+                <h1>Workplace Monitor: <span id="uiZoneName" style="color: var(--accent-grok);">Awaiting Zone...</span></h1>
             </div>
             <div id="status" class="status-badge">Initializing Gateway Stream...</div>
         </div>

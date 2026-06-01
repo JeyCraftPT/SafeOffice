@@ -104,18 +104,65 @@ function startLiveTelemetryStreaming() {
 
             // Refresh Client Visual Interface Elements
             if (terminalEntry) {
-                document.getElementById('temperature').innerText = terminalEntry.temperature || "N/A";
-                document.getElementById('humidity').innerText = terminalEntry.humidity || "N/A";
-                document.getElementById('air_quality').innerText = terminalEntry.air_quality_raw || "--";
+const zoneNameEl = document.getElementById('uiZoneName');
+                if (zoneNameEl) {
+                    zoneNameEl.innerText = terminalEntry.zona_id || "Unassigned Zone";
+                }
+
+                // Grab HTML Elements
+                const tempEl = document.getElementById('temperature');
+                const humEl = document.getElementById('humidity');
+                const gasEl = document.getElementById('air_quality');
+                const rainEl = document.getElementById('rain');
+                const alertBanner = document.getElementById('alertBanner');
+                const alertText = document.getElementById('alertText');
+
+                // 1. Update Values
+                tempEl.innerText = terminalEntry.temperature || "N/A";
+                humEl.innerText = terminalEntry.humidity || "N/A";
+                gasEl.innerText = terminalEntry.air_quality_raw || "--";
                 document.getElementById('light').innerText = terminalEntry.light_level ? Math.round(terminalEntry.light_level) : "--";
-                document.getElementById('rain').innerText = terminalEntry.rain_status || "Unknown";
-                
-                // Dynamic style adjustment based on rain detection
-                const rainCard = document.querySelector('.rain-card .value-display');
-                if(terminalEntry.rain_status === "Raining") {
-                    rainCard.style.color = "#a855f7";
+                rainEl.innerText = terminalEntry.rain_status || "Unknown";
+
+                // 2. TRAFFIC LIGHT LOGIC (Semáforo)
+                // Clear old classes
+                tempEl.className = humEl.className = gasEl.className = rainEl.className = "";
+                let isCritical = false;
+                let criticalMessage = "";
+
+                // Temperature Logic (Example: >28 is Red, <22 is Yellow, else Green)
+                let t = parseFloat(terminalEntry.temperature);
+                if (t >= 28) { tempEl.classList.add("status-danger"); }
+                else if (t <= 20) { tempEl.classList.add("status-warning"); }
+                else { tempEl.classList.add("status-safe"); }
+
+                // Air Quality Logic (Raw Gas > 800 is Red)
+                let g = parseInt(terminalEntry.air_quality_raw);
+                if (g > 400) { 
+                    gasEl.classList.add("status-danger"); 
+                    isCritical = true;
+                    criticalMessage = "HIGH GAS/SMOKE LEVELS DETECTED!";
+                }
+                else if (g > 600) { gasEl.classList.add("status-warning"); }
+                else { gasEl.classList.add("status-safe"); }
+
+                // Rain/Water Leak Logic
+                if (terminalEntry.rain_status === "Raining") {
+                    rainEl.classList.add("status-danger");
+                    isCritical = true;
+                    criticalMessage = "WATER LEAK DETECTED!";
                 } else {
-                    rainCard.style.color = "#fff";
+                    rainEl.classList.add("status-safe");
+                }
+
+                // 3. WEB NOTIFICATION SYSTEM
+                if (alertBanner && alertText) {
+                    if (isCritical) {
+                        alertText.innerText = criticalMessage;
+                        alertBanner.classList.add("show");
+                    } else {
+                        alertBanner.classList.remove("show");
+                    }
                 }
             }
 

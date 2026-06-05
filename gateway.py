@@ -55,7 +55,7 @@ def on_message(client, userdata, msg):
         # Point to the '/Telemetry' path in your database
         ref = db.reference('/Telemetry')
         data["timestamp"] = int(time.time() * 1000)
-        data["zona_id"] = "Sala de Servidores 01"
+        data["zona_id"] = "Sala 01"
         
         # .push() replicates the 'pushJSON' history behavior by creating a unique timestamped ID
         new_node_ref = ref.push(data)
